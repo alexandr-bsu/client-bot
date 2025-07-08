@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8077:8077"
+    environment:
+      - REDIS_HOST=51.250.42.45
+      - REDIS_PORT=6380
+      - REDIS_USERNAME=admin
+      - REDIS_PASSWORD=%Qb9OyqXABDWeCv*
+      - REDIS_DB=0
+  
