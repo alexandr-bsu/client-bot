@@ -297,7 +297,7 @@ async def get_schedule_by_offset(offset: int):
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"API error: {str(e)}")
 
-@app.post("/delete-all-aggregated")
+@app.delete("/delete-all-aggregated")
 async def delete_all_aggregated():
     """
     Удаляет все ключи из Redis, начинающиеся с all_agggregated_
