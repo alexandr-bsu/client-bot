@@ -338,6 +338,9 @@ async def get_edu_keys_pipeline_batch(batch_size: int = 1000, use_cache: bool = 
     if use_cache:
         cached_result = get_edu_keys_from_lru_cache()
         if cached_result:
+            end_time = datetime.now()
+            elapsed = (end_time - start_time).total_seconds()
+            print(f"/edu-keys-pipeline-batch execution time: {elapsed} seconds, total values: {len(cached_result)}")
             return cached_result
     try:
         pattern = "edu_*"
@@ -372,15 +375,15 @@ async def get_edu_keys_pipeline_batch(batch_size: int = 1000, use_cache: bool = 
         end_time = datetime.now()
         elapsed = (end_time - start_time).total_seconds()
         result = all_values
+        
         if use_cache:
             set_edu_keys_to_lru_cache(result)
-        print(f"/edu-keys-pipeline-batch execution time :{elapsed} seconds")
+        print(f"/edu-keys-pipeline-batch execution time: {elapsed} seconds, total values: {len(all_values)}")
         return result
         
     except Exception as e:
         end_time = datetime.now()
         elapsed = (end_time - start_time).total_seconds()
-        print(f"/edu-keys-pipeline-batch execution time (with error): {elapsed} seconds")
         raise HTTPException(status_code=500, detail=f"Error fetching edu_ keys: {str(e)}")
 
 @app.post("/invalidate-edu-lru-cache")
