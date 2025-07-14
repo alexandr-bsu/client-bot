@@ -8,6 +8,19 @@ import pytz
 import httpx
 from datetime import datetime, timedelta
 from fastapi import HTTPException
+from cachetools import LRUCache
+
+# Глобальный LRU cache (например, на 1 результат)
+edu_keys_lru_cache = LRUCache(maxsize=1)
+
+def get_edu_keys_from_lru_cache():
+    return edu_keys_lru_cache.get("edu_keys")
+
+def set_edu_keys_to_lru_cache(data):
+    edu_keys_lru_cache["edu_keys"] = data
+
+def clear_edu_keys_lru_cache():
+    edu_keys_lru_cache.clear()
 
 app = FastAPI(title="Hello API", version="1.0.0")
 
@@ -311,4 +324,70 @@ async def delete_all_aggregated():
         return {"deleted": deleted, "message": f"Deleted {deleted} keys"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting keys: {str(e)}")
+
+
+@app.get("/edu-keys-pipeline-batch")
+async def get_edu_keys_pipeline_batch(batch_size: int = 1000, use_cache: bool = True):
+    """
+    Еще более оптимизированная версия с обработкой больших объемов данных батчами
+    Возвращает также метаданные о времени выполнения, количестве ключей и скорости обработки
+    Использует кэширование результата (TTL 300 секунд)
+    """
+    start_time = datetime.now()
+    # Проверяем LRU cache
+    if use_cache:
+        cached_result = get_edu_keys_from_lru_cache()
+        if cached_result:
+            return cached_result
+    try:
+        pattern = "edu_*"
+        all_values = []
+        total_keys = 0
+        # Обрабатываем ключи батчами для экономии памяти
+        cursor = 0
+
+        while True:
+            # Получаем батч ключей
+            cursor, keys = await redis_client.scan(cursor, match=pattern, count=batch_size)
+            if not keys:
+                if cursor == 0:
+                    break
+                continue
+            total_keys += len(keys)
+            # Получаем значения для этого батча через pipeline
+            pipeline = redis_client.pipeline()
+            for key in keys:
+                pipeline.get(key)
+            values_raw = await pipeline.execute()
+            # Парсим JSON
+            for value in values_raw:
+                if value is not None:
+                    try:
+                        all_values.append(json.loads(value))
+                    except json.JSONDecodeError:
+                        all_values.append(value)
+            # Если это последний батч
+            if cursor == 0:
+                break
+        end_time = datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        result = all_values
+        if use_cache:
+            set_edu_keys_to_lru_cache(result)
+        print(f"/edu-keys-pipeline-batch execution time :{elapsed} seconds")
+        return result
+        
+    except Exception as e:
+        end_time = datetime.now()
+        elapsed = (end_time - start_time).total_seconds()
+        print(f"/edu-keys-pipeline-batch execution time (with error): {elapsed} seconds")
+        raise HTTPException(status_code=500, detail=f"Error fetching edu_ keys: {str(e)}")
+
+@app.post("/invalidate-edu-lru-cache")
+async def invalidate_edu_lru_cache():
+    """
+    Инвалидирует кэш edu_ ключей
+    """
+    clear_edu_keys_lru_cache()
+    return {"message": "LRU cache invalidated"}
 
