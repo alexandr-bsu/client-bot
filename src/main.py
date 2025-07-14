@@ -9,6 +9,7 @@ import httpx
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from cachetools import LRUCache
+from fastapi.middleware.gzip import GZipMiddleware
 
 # Глобальный LRU cache (например, на 1 результат)
 edu_keys_lru_cache = LRUCache(maxsize=1)
@@ -23,6 +24,9 @@ def clear_edu_keys_lru_cache():
     edu_keys_lru_cache.clear()
 
 app = FastAPI(title="Hello API", version="1.0.0")
+
+# Добавляем GZip middleware для сжатия ответов
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Добавляем CORS middleware
 app.add_middleware(
